@@ -25,6 +25,51 @@
 #include <internal/x509_int.h>
 #include "x509_lcl.h"
 
+//Jongho added - start
+#define EMC_IMPL
+#ifdef EMC_IMPL
+
+#include <curl/curl.h>  //curl commands to send a query to the blockchain core
+#include <jsmn.h>       //json parser
+#define EMC_WALLET_URL "http://emccoinrpc:Helium7()@127.0.0.1:8775"
+#define EMC_ISSUER_STR "O=EmerCoin, OU=PKI, CN=EMCSSL/emailAddress=team@emercoin.com/UID=EMC"
+
+struct MemoryStruct {
+    char *memory;
+    size_t size;
+};
+
+static size_t
+write_memory_callback(void *contents, size_t size, size_t nmemb, void *userp)
+{
+    size_t realsize = size * nmemb;
+    struct MemoryStruct *mem = (struct MemoryStruct *)userp;
+
+    mem->memory = realloc(mem->memory, mem->size + realsize + 1);
+    if(mem->memory == NULL) {
+        printf("not enough memory (realloc returned NULL)\n");
+        return 0;
+    }
+
+    memcpy(&(mem->memory[mem->size]), contents, realsize);
+    mem->size += realsize;
+    mem->memory[mem->size] = 0;
+
+    return realsize;
+}
+
+static int jsoneq(const char *json, jsmntok_t *tok, const char *s) {
+    if (tok->type == JSMN_STRING && (int) strlen(s) == tok->end - tok->start &&
+            strncmp(json + tok->start, s, tok->end - tok->start) == 0) {
+        return 0;
+    }
+    return -1;
+}
+
+#endif
+
+//Jongho added - end
+
 /* CRL score values */
 
 /* No unhandled critical extensions */
@@ -287,6 +332,151 @@ int X509_verify_cert(X509_STORE_CTX *ctx)
         !verify_cb_cert(ctx, ctx->cert, 0, X509_V_ERR_EE_KEY_TOO_SMALL))
         return 0;
 
+
+
+//Jongho added - start
+#ifdef EMC_IMPL
+    //---------------------------------------------------------------------------
+    // Writer: Jongho Won (wonzongho@gmail.com, jwon@vmare.com)
+    // We should check the certificate issuer contains "EmerCoin".
+    // If so, we should connect EmerCoin Core to check if the serial number exists.
+    //---------------------------------------------------------------------------
+
+
+    //---------------------------------------------------------------------------
+    // 1.   read a certificate and check if its issuer contains 
+    //      "O=EmerCoin, OU=PKI, CN=EMCSSL/emailAddress=team@emercoin.com/UID=EMC".
+    //      If yes, extract the serial number.  
+    //---------------------------------------------------------------------------
+
+    BIO *out = BIO_new_fp(stdout,BIO_NOCLOSE);
+    BIO *bio = BIO_new(BIO_s_mem());
+    BUF_MEM *bptr;
+
+    if (bio == NULL) {
+        BIO_printf(out, "failed to load certificate\n");
+        return -1;
+    }
+
+    char buffer[1024];
+    memset(buffer, '\0', 1024);
+
+    //print issuer
+    BIO_printf(out, "issuer=%s\n", X509_NAME_oneline(X509_get_issuer_name(ctx->cert), 0, 0));
+    BIO_printf(bio, "%s", X509_NAME_oneline(X509_get_issuer_name(ctx->cert), 0, 0));
+    BIO_get_mem_ptr(bio, &bptr);
+    memcpy(buffer, bptr->data, bptr->length);
+    BIO_printf(out, "issuer:=%s\n", buffer);
+    BIO_free(bio);
+    //check the issuer is not Emercoin
+    if (!strcmp(buffer, EMC_ISSUER_STR)) {
+        if (DANETLS_ENABLED(dane))
+            ret = dane_verify(ctx);
+        else
+            ret = verify_chain(ctx);
+
+        /*
+        * Safety-net.  If we are returning an error, we must also set ctx->error,
+        * so that the chain is not considered verified should the error be ignored
+        * (e.g. TLS with SSL_VERIFY_NONE).
+        */
+        if (ret <= 0 && ctx->error == X509_V_OK)
+            ctx->error = X509_V_ERR_UNSPECIFIED;
+        return ret;
+    }
+
+    //print serial
+    BIO_printf(out, "serial:=");
+    i2a_ASN1_INTEGER(out, X509_get_serialNumber(ctx->cert));
+    BIO_printf(out, "\n");
+    bio = BIO_new(BIO_s_mem());
+    i2a_ASN1_INTEGER(bio, X509_get_serialNumber(ctx->cert));
+    bptr = NULL;
+    BIO_get_mem_ptr(bio, &bptr);
+    memset(buffer, '\0', 1024);
+    memcpy(buffer, bptr->data, bptr->length);
+    BIO_free(bio);
+
+    //change the serial number to lower cases.
+    int c = 0;
+    while (buffer[c] != '\0') {
+        if (buffer[c] >= 'A' && buffer[c] <= 'Z') {
+            buffer[c] = buffer[c] + 32;
+        }
+        c++;
+    }
+    BIO_printf(out, "Serial:=%s\n", buffer);
+
+
+    //----------------------------------------
+    // 2.   Send the serial number (key) to the Emercoin core.
+    //----------------------------------------
+    //----------------------------------------
+    // 2. 1.    make a JSON format for a POST request
+    //----------------------------------------
+    CURL *curl;
+    CURLcode res;
+    char json_request[1024];
+
+    strcpy(json_request, "{\n\t\"params\": [\n");
+    strcat(json_request, "\t\t\"ssl:");
+    strcat(json_request, buffer);
+    //strcat(json_request, key);
+    strcat(json_request, "\"\n");   
+    strcat(json_request, "\t\t],\n");
+    strcat(json_request, "\t\"method\": \"name_show\",\n");
+    strcat(json_request, "\t\"id\": 1\n");
+    strcat(json_request, "}");
+
+    printf("%s, %ld\n", json_request, strlen(json_request));
+
+
+    //----------------------------------------
+    // 2. 2.    send a POST request using curl and
+    //          receive a response
+    //----------------------------------------
+    struct MemoryStruct chunk;
+
+    curl = curl_easy_init();
+
+    if(curl) { 
+        chunk.memory = malloc(1);
+        chunk.size = 0; 
+        curl_easy_setopt(curl, CURLOPT_URL, EMC_WALLET_URL);
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, strlen(json_request));
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_request);
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_memory_callback);
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, (void *)&chunk);
+
+        res = curl_easy_perform(curl);
+
+        if(res != CURLE_OK) {
+            return -1;
+            fprintf(stderr, "curl_easy_perform() failed: %s\n", 
+                curl_easy_strerror(res));
+        }else {
+            printf("%lu bytes retrieved\n %s", (long)chunk.size, chunk.memory);
+        }
+
+        curl_easy_cleanup(curl);
+    }
+
+
+
+
+
+    return 0;
+
+
+
+
+
+
+
+
+//Jongho added - end
+
+#else // if EMC_IMPL is not defined
     if (DANETLS_ENABLED(dane))
         ret = dane_verify(ctx);
     else
@@ -300,6 +490,8 @@ int X509_verify_cert(X509_STORE_CTX *ctx)
     if (ret <= 0 && ctx->error == X509_V_OK)
         ctx->error = X509_V_ERR_UNSPECIFIED;
     return ret;
+#endif
+
 }
 
 /*
