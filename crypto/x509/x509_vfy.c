@@ -31,7 +31,7 @@
 
 #include <curl/curl.h>  //curl commands to send a query to the blockchain core
 #include <jsmn.h>       //json parser
-#define EMC_WALLET_URL "http://emccoinrpc:Helium7()@127.0.0.1:8775"
+#define EMC_CORE_URL "http://emccoinrpc:Helium7()@127.0.0.1:8775"
 #define EMC_ISSUER_STR "O=EmerCoin, OU=PKI, CN=EMCSSL/emailAddress=team@emercoin.com/UID=EMC"
 
 struct MemoryStruct {
@@ -334,6 +334,9 @@ int X509_verify_cert(X509_STORE_CTX *ctx)
 
 
 
+
+
+
 //Jongho added - start
 #ifdef EMC_IMPL
     //---------------------------------------------------------------------------
@@ -355,14 +358,16 @@ int X509_verify_cert(X509_STORE_CTX *ctx)
 
     if (bio == NULL) {
         BIO_printf(out, "failed to load certificate\n");
+        ctx->error = X509_V_ERR_OUT_OF_MEM;
         return -1;
     }
 
     char buffer[1024];
     memset(buffer, '\0', 1024);
 
+    BIO_printf(out, "\n[1.1 Extract the issuer name anc check if this is Emercoin certificate.]\n");
     //print issuer
-    BIO_printf(out, "issuer=%s\n", X509_NAME_oneline(X509_get_issuer_name(ctx->cert), 0, 0));
+    //BIO_printf(out, "issuer=%s\n", X509_NAME_oneline(X509_get_issuer_name(ctx->cert), 0, 0));
     BIO_printf(bio, "%s", X509_NAME_oneline(X509_get_issuer_name(ctx->cert), 0, 0));
     BIO_get_mem_ptr(bio, &bptr);
     memcpy(buffer, bptr->data, bptr->length);
@@ -385,10 +390,21 @@ int X509_verify_cert(X509_STORE_CTX *ctx)
         return ret;
     }
 
+    //check certificate valication time
+    BIO_printf(out, "\n[1.2. Check certificate valication time.]\n");
+    if(!x509_check_cert_time(ctx, ctx->cert, -1)) {
+         ctx->error = X509_V_ERR_OUT_OF_MEM;
+        return -1;       
+    }
+    BIO_printf(out, "OK\n");
+
+
     //print serial
-    BIO_printf(out, "serial:=");
-    i2a_ASN1_INTEGER(out, X509_get_serialNumber(ctx->cert));
-    BIO_printf(out, "\n");
+    BIO_printf(out, "\n[1.3. Extract the serial.]\n");
+
+    //BIO_printf(out, "serial:=");
+    //i2a_ASN1_INTEGER(out, X509_get_serialNumber(ctx->cert));
+    //BIO_printf(out, "\n");
     bio = BIO_new(BIO_s_mem());
     i2a_ASN1_INTEGER(bio, X509_get_serialNumber(ctx->cert));
     bptr = NULL;
@@ -412,16 +428,17 @@ int X509_verify_cert(X509_STORE_CTX *ctx)
     // 2.   Send the serial number (key) to the Emercoin core.
     //----------------------------------------
     //----------------------------------------
-    // 2. 1.    make a JSON format for a POST request
+    // 2. 1.    construct a JSON format for a POST request
     //----------------------------------------
     CURL *curl;
     CURLcode res;
     char json_request[1024];
 
+    BIO_printf(out, "\n[2.1. Construct a JSON format for a POST request.]\n");
+
     strcpy(json_request, "{\n\t\"params\": [\n");
     strcat(json_request, "\t\t\"ssl:");
     strcat(json_request, buffer);
-    //strcat(json_request, key);
     strcat(json_request, "\"\n");   
     strcat(json_request, "\t\t],\n");
     strcat(json_request, "\t\"method\": \"name_show\",\n");
@@ -430,19 +447,19 @@ int X509_verify_cert(X509_STORE_CTX *ctx)
 
     printf("%s, %ld\n", json_request, strlen(json_request));
 
-
     //----------------------------------------
     // 2. 2.    send a POST request using curl and
     //          receive a response
     //----------------------------------------
     struct MemoryStruct chunk;
-
     curl = curl_easy_init();
+
+    BIO_printf(out, "\n[2.2. Send the POST request to the Emercoin core.]\n");
 
     if(curl) { 
         chunk.memory = malloc(1);
         chunk.size = 0; 
-        curl_easy_setopt(curl, CURLOPT_URL, EMC_WALLET_URL);
+        curl_easy_setopt(curl, CURLOPT_URL, EMC_CORE_URL);
         curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, strlen(json_request));
         curl_easy_setopt(curl, CURLOPT_POSTFIELDS, json_request);
         curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_memory_callback);
@@ -451,30 +468,159 @@ int X509_verify_cert(X509_STORE_CTX *ctx)
         res = curl_easy_perform(curl);
 
         if(res != CURLE_OK) {
+            ctx->error = X509_V_ERR_FAILED_TO_CONNECT_EMC_CORE;
             return -1;
-            fprintf(stderr, "curl_easy_perform() failed: %s\n", 
-                curl_easy_strerror(res));
+            //fprintf(stderr, "curl_easy_perform() failed: %s\n", 
+            //    curl_easy_strerror(res));
         }else {
-            printf("%lu bytes retrieved\n %s", (long)chunk.size, chunk.memory);
+            //printf("%lu bytes retrieved\n %s", (long)chunk.size, chunk.memory);
         }
 
         curl_easy_cleanup(curl);
+    } else {
+        ctx->error = X509_V_ERR_FAILED_TO_CONNECT_EMC_CORE;
+        return -1;
     }
 
+    BIO_printf(out, "OK\n");
+
+    //----------------------------------------
+    // 3.   parse the response and print the result
+    //----------------------------------------
+    int r, i;
+    jsmn_parser p;
+    jsmntok_t t[128]; /* We expect no more than 128 tokens */
+    jsmn_init(&p);
+    char lookup_sha256_result[64];
+    char lookup_success = -1;
+
+    BIO_printf(out, "\n[3.1. Parse the JSON response and print the result.]\n");
+
+    r = jsmn_parse(&p, chunk.memory, strlen(chunk.memory), t, sizeof(t)/sizeof(t[0]));
+    if (r < 0) {
+        BIO_printf(out, "Failed to parse JSON: %d\n", r);
+        ctx->error = X509_V_ERR_FAILED_TO_PARSE_JSON;
+        return -1;
+    }
+
+    /* Assume the top-level element is an object */
+    if (r < 1 || t[0].type != JSMN_OBJECT) {
+        BIO_printf(out, "Object expected\n");
+        ctx->error = X509_V_ERR_TOP_LEVEL_ELEMENT_IS_NOT_OBJECT;
+        return -1;
+    }
+
+    /* Loop over all keys of the root object */
+    for (i = 1; i < r; i++) {
+        if (jsoneq(chunk.memory, &t[i], "error") == 0) {
+            BIO_printf(out, "- error: %.*s\n", t[i+1].end-t[i+1].start, chunk.memory + t[i+1].start);
+            i++;
+        } else if (jsoneq(chunk.memory, &t[i], "code") == 0) {
+            BIO_printf(out, "  - code: %.*s\n", t[i+1].end-t[i+1].start, chunk.memory + t[i+1].start);
+            i++;
+        } else if (jsoneq(chunk.memory, &t[i], "message") == 0) {
+            BIO_printf(out, "  - message: %.*s\n", t[i+1].end-t[i+1].start, chunk.memory + t[i+1].start);
+            i++;
+        } else if (jsoneq(chunk.memory, &t[i], "result") == 0) {
+            BIO_printf(out, "- result: %.*s\n", t[i+1].end-t[i+1].start, chunk.memory + t[i+1].start);
+            i++;
+        } else if (jsoneq(chunk.memory, &t[i], "id") == 0) {
+            BIO_printf(out, "  - id: %.*s\n", t[i+1].end-t[i+1].start, chunk.memory + t[i+1].start);
+            i++;
+        } else if (jsoneq(chunk.memory, &t[i], "name") == 0) {
+            BIO_printf(out, "  - name: %.*s\n", t[i+1].end-t[i+1].start, chunk.memory + t[i+1].start);
+            i++;
+        } else if (jsoneq(chunk.memory, &t[i], "value") == 0) {
+            BIO_printf(out, "  - value: %.*s\n", t[i+1].end-t[i+1].start, chunk.memory + t[i+1].start);
+            lookup_success = 1;
+            memcpy(lookup_sha256_result, chunk.memory + t[i+1].start + 7, 64);
+            //BIO_printf(out, "lookup_sha256_result:%.*s, %d\n", 64, lookup_sha256_result, t[i+1].end-t[i+1].start);
+            i++;
+        } else if (jsoneq(chunk.memory, &t[i], "txid") == 0) {
+            BIO_printf(out, "  - txid: %.*s\n", t[i+1].end-t[i+1].start, chunk.memory + t[i+1].start);
+            i++;
+        } else if (jsoneq(chunk.memory, &t[i], "address") == 0) {
+            BIO_printf(out, "  - address: %.*s\n", t[i+1].end-t[i+1].start, chunk.memory + t[i+1].start);
+            i++;
+        } else if (jsoneq(chunk.memory, &t[i], "expires_in") == 0) {
+            BIO_printf(out, "  - expires_in: %.*s\n", t[i+1].end-t[i+1].start, chunk.memory + t[i+1].start);
+            i++;
+        } else if (jsoneq(chunk.memory, &t[i], "expires_at") == 0) {
+            BIO_printf(out, "  - expires_at: %.*s\n", t[i+1].end-t[i+1].start, chunk.memory + t[i+1].start);
+            i++;
+        } else if (jsoneq(chunk.memory, &t[i], "time") == 0) {
+            BIO_printf(out, "  - time: %.*s\n", t[i+1].end-t[i+1].start, chunk.memory + t[i+1].start);
+            i++;
+        } else {
+            BIO_printf(out, "Unexpected key: %.*s\n", t[i].end-t[i].start, chunk.memory + t[i].start);
+        }
+    }
+
+    //----------------------------------------
+    // 4.   compute the hash of the certificate
+    //      check if the hash value is equal to the returned value.
+    //----------------------------------------
+    if (lookup_success < 0) {
+        ctx->error = X509_V_ERR_NO_NAME_IN_EMC_CORE; 
+        return -1;
+    }
+
+    unsigned int n;
+    unsigned char md[32];
+    char compute_sha256_result[64];
+    const EVP_MD *digest = NULL;
+
+    BIO_printf(out, "\n[4.1. Compute the hash of the certificate.]\n");
 
 
+    digest = EVP_get_digestbyname("sha256"); //Other hash functions should be supported in future.
+    if (!digest) {
+        BIO_printf(out, "Unknown digest sha256\n");
+        ctx->error = X509_V_ERR_INVALID_HASH_FUNC;
+        return -1;
+    }
+        
+    if (!X509_digest(ctx->cert, digest, md, &n)) {
+        BIO_printf(out, "out of memory\n");
+        ctx->error = X509_V_ERR_OUT_OF_MEM;
+        return -1;
+    }
 
+    //BIO_printf(out, "%s Fingerprint=", OBJ_nid2sn(EVP_MD_type(digest)));
+    int step = 0;
+    for (i = 0; i < (int)n; i++) {
+        //BIO_printf(out, "%02X%c", md[i], (i + 1 == (int)n)? '\n' : ':');
+        step += sprintf(compute_sha256_result+step, "%02x", md[i]);
+    }
 
-    return 0;
+    BIO_printf(out, "sha256:%.*s\n", 64, compute_sha256_result);
 
+    //----------------------------------------
+    // 4. 1     compare two values
+    //----------------------------------------
+    BIO_printf(out, "\n[4.1. Compare the computed hash result with the hash received from the EMC core.]\n");
 
+    for (i = 0; i < 64; i++) {
+        if (compute_sha256_result[i] != lookup_sha256_result[i]) {
+            ctx->error = X509_V_ERR_HASH_NOT_MATCHED;
+            BIO_printf(out, "Two hash values are not matched.\n");
+            return -1;
+        }
+    }
 
-
-
-
-
-
+    //BIO_printf(out, "success return 1\n");
+    return 1;
 //Jongho added - end
+
+
+
+
+
+
+
+
+
+
 
 #else // if EMC_IMPL is not defined
     if (DANETLS_ENABLED(dane))

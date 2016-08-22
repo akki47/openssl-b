@@ -181,6 +181,15 @@ void X509_STORE_CTX_set_depth(X509_STORE_CTX *ctx, int depth);
 
 # define         X509_V_ERR_PROXY_SUBJECT_NAME_VIOLATION         72
 
+//Jongho added - start
+# define         X509_V_ERR_FAILED_TO_CONNECT_EMC_CORE           80
+# define         X509_V_ERR_FAILED_TO_PARSE_JSON                 81
+# define         X509_V_ERR_TOP_LEVEL_ELEMENT_IS_NOT_OBJECT      82
+# define         X509_V_ERR_INVALID_HASH_FUNC                    83
+# define         X509_V_ERR_HASH_NOT_MATCHED                     84
+# define         X509_V_ERR_NO_NAME_IN_EMC_CORE                  85
+//Jongho added - end
+
 /* Certificate verify flags */
 
 # if OPENSSL_API_COMPAT < 0x10100000L
