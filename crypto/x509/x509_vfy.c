@@ -34,7 +34,7 @@
 
 #include <curl/curl.h>  //curl commands to send a query to the blockchain core
 #include <jsmn.h>       //json parser
-#define EMC_CORE_URL "http://emccoinrpc:Helium7()@127.0.0.1:8775"
+#define EMC_CORE_URL "http://emccoinrpc:emccoinpass@127.0.0.1:8775"
 #define EMC_ISSUER_STR "O=EmerCoin, OU=PKI, CN=EMCSSL/emailAddress=team@emercoin.com/UID=EMC"
 
 struct MemoryStruct {
