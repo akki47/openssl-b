@@ -25,7 +25,10 @@
 #include <internal/x509_int.h>
 #include "x509_lcl.h"
 
+
+
 //Jongho added - start
+#define EMC_PRINT
 #define EMC_IMPL
 #ifdef EMC_IMPL
 
@@ -67,8 +70,9 @@ static int jsoneq(const char *json, jsmntok_t *tok, const char *s) {
 }
 
 #endif
-
 //Jongho added - end
+
+
 
 /* CRL score values */
 
@@ -357,7 +361,9 @@ int X509_verify_cert(X509_STORE_CTX *ctx)
     BUF_MEM *bptr;
 
     if (bio == NULL) {
+#ifdef EMC_PRINT
         BIO_printf(out, "failed to load certificate\n");
+#endif
         ctx->error = X509_V_ERR_OUT_OF_MEM;
         return -1;
     }
@@ -365,13 +371,17 @@ int X509_verify_cert(X509_STORE_CTX *ctx)
     char buffer[1024];
     memset(buffer, '\0', 1024);
 
+#ifdef EMC_PRINT
     BIO_printf(out, "\n[1.1 Extract the issuer name anc check if this is Emercoin certificate.]\n");
+#endif
     //print issuer
     //BIO_printf(out, "issuer=%s\n", X509_NAME_oneline(X509_get_issuer_name(ctx->cert), 0, 0));
     BIO_printf(bio, "%s", X509_NAME_oneline(X509_get_issuer_name(ctx->cert), 0, 0));
     BIO_get_mem_ptr(bio, &bptr);
     memcpy(buffer, bptr->data, bptr->length);
+#ifdef EMC_PRINT
     BIO_printf(out, "issuer:=%s\n", buffer);
+#endif
     BIO_free(bio);
     //check the issuer is not Emercoin
     if (!strcmp(buffer, EMC_ISSUER_STR)) {
@@ -391,16 +401,22 @@ int X509_verify_cert(X509_STORE_CTX *ctx)
     }
 
     //check certificate valication time
+#ifdef EMC_PRINT
     BIO_printf(out, "\n[1.2. Check certificate valication time.]\n");
+#endif
     if(!x509_check_cert_time(ctx, ctx->cert, -1)) {
          ctx->error = X509_V_ERR_OUT_OF_MEM;
         return -1;       
     }
+#ifdef EMC_PRINT
     BIO_printf(out, "OK\n");
+#endif
 
 
     //print serial
+#ifdef EMC_PRINT
     BIO_printf(out, "\n[1.3. Extract the serial.]\n");
+#endif
 
     //BIO_printf(out, "serial:=");
     //i2a_ASN1_INTEGER(out, X509_get_serialNumber(ctx->cert));
@@ -421,8 +437,11 @@ int X509_verify_cert(X509_STORE_CTX *ctx)
         }
         c++;
     }
+#ifdef EMC_PRINT
     BIO_printf(out, "Serial:=%s\n", buffer);
+#endif
 
+#if 1
 
     //----------------------------------------
     // 2.   Send the serial number (key) to the Emercoin core.
@@ -434,8 +453,9 @@ int X509_verify_cert(X509_STORE_CTX *ctx)
     CURLcode res;
     char json_request[1024];
 
+#ifdef EMC_PRINT
     BIO_printf(out, "\n[2.1. Construct a JSON format for a POST request.]\n");
-
+#endif
     strcpy(json_request, "{\n\t\"params\": [\n");
     strcat(json_request, "\t\t\"ssl:");
     strcat(json_request, buffer);
@@ -444,18 +464,18 @@ int X509_verify_cert(X509_STORE_CTX *ctx)
     strcat(json_request, "\t\"method\": \"name_show\",\n");
     strcat(json_request, "\t\"id\": 1\n");
     strcat(json_request, "}");
-
-    printf("%s, %ld\n", json_request, strlen(json_request));
-
+#ifdef EMC_PRINT
+    BIO_printf(out, "%s, %ld\n", json_request, strlen(json_request));
+#endif
     //----------------------------------------
     // 2. 2.    send a POST request using curl and
     //          receive a response
     //----------------------------------------
     struct MemoryStruct chunk;
     curl = curl_easy_init();
-
+#ifdef EMC_PRINT
     BIO_printf(out, "\n[2.2. Send the POST request to the Emercoin core.]\n");
-
+#endif
     if(curl) { 
         chunk.memory = malloc(1);
         chunk.size = 0; 
@@ -481,21 +501,21 @@ int X509_verify_cert(X509_STORE_CTX *ctx)
         ctx->error = X509_V_ERR_FAILED_TO_CONNECT_EMC_CORE;
         return -1;
     }
-
+#ifdef EMC_PRINT
     BIO_printf(out, "OK\n");
-
+#endif
     //----------------------------------------
     // 3.   parse the response and print the result
     //----------------------------------------
     int r, i;
     jsmn_parser p;
-    jsmntok_t t[128]; /* We expect no more than 128 tokens */
+    jsmntok_t t[128]; 
     jsmn_init(&p);
     char lookup_sha256_result[64];
     char lookup_success = -1;
-
+#ifdef EMC_PRINT
     BIO_printf(out, "\n[3.1. Parse the JSON response and print the result.]\n");
-
+#endif
     r = jsmn_parse(&p, chunk.memory, strlen(chunk.memory), t, sizeof(t)/sizeof(t[0]));
     if (r < 0) {
         BIO_printf(out, "Failed to parse JSON: %d\n", r);
@@ -505,7 +525,9 @@ int X509_verify_cert(X509_STORE_CTX *ctx)
 
     /* Assume the top-level element is an object */
     if (r < 1 || t[0].type != JSMN_OBJECT) {
+#ifdef EMC_PRINT
         BIO_printf(out, "Object expected\n");
+#endif
         ctx->error = X509_V_ERR_TOP_LEVEL_ELEMENT_IS_NOT_OBJECT;
         return -1;
     }
@@ -513,46 +535,46 @@ int X509_verify_cert(X509_STORE_CTX *ctx)
     /* Loop over all keys of the root object */
     for (i = 1; i < r; i++) {
         if (jsoneq(chunk.memory, &t[i], "error") == 0) {
-            BIO_printf(out, "- error: %.*s\n", t[i+1].end-t[i+1].start, chunk.memory + t[i+1].start);
+            //BIO_printf(out, "- error: %.*s\n", t[i+1].end-t[i+1].start, chunk.memory + t[i+1].start);
             i++;
         } else if (jsoneq(chunk.memory, &t[i], "code") == 0) {
-            BIO_printf(out, "  - code: %.*s\n", t[i+1].end-t[i+1].start, chunk.memory + t[i+1].start);
+            //BIO_printf(out, "  - code: %.*s\n", t[i+1].end-t[i+1].start, chunk.memory + t[i+1].start);
             i++;
         } else if (jsoneq(chunk.memory, &t[i], "message") == 0) {
-            BIO_printf(out, "  - message: %.*s\n", t[i+1].end-t[i+1].start, chunk.memory + t[i+1].start);
+            //BIO_printf(out, "  - message: %.*s\n", t[i+1].end-t[i+1].start, chunk.memory + t[i+1].start);
             i++;
         } else if (jsoneq(chunk.memory, &t[i], "result") == 0) {
-            BIO_printf(out, "- result: %.*s\n", t[i+1].end-t[i+1].start, chunk.memory + t[i+1].start);
+            //BIO_printf(out, "- result: %.*s\n", t[i+1].end-t[i+1].start, chunk.memory + t[i+1].start);
             i++;
         } else if (jsoneq(chunk.memory, &t[i], "id") == 0) {
-            BIO_printf(out, "  - id: %.*s\n", t[i+1].end-t[i+1].start, chunk.memory + t[i+1].start);
+            //BIO_printf(out, "  - id: %.*s\n", t[i+1].end-t[i+1].start, chunk.memory + t[i+1].start);
             i++;
         } else if (jsoneq(chunk.memory, &t[i], "name") == 0) {
-            BIO_printf(out, "  - name: %.*s\n", t[i+1].end-t[i+1].start, chunk.memory + t[i+1].start);
+            //BIO_printf(out, "  - name: %.*s\n", t[i+1].end-t[i+1].start, chunk.memory + t[i+1].start);
             i++;
         } else if (jsoneq(chunk.memory, &t[i], "value") == 0) {
-            BIO_printf(out, "  - value: %.*s\n", t[i+1].end-t[i+1].start, chunk.memory + t[i+1].start);
+            //BIO_printf(out, "  - value: %.*s\n", t[i+1].end-t[i+1].start, chunk.memory + t[i+1].start);
             lookup_success = 1;
             memcpy(lookup_sha256_result, chunk.memory + t[i+1].start + 7, 64);
             //BIO_printf(out, "lookup_sha256_result:%.*s, %d\n", 64, lookup_sha256_result, t[i+1].end-t[i+1].start);
             i++;
         } else if (jsoneq(chunk.memory, &t[i], "txid") == 0) {
-            BIO_printf(out, "  - txid: %.*s\n", t[i+1].end-t[i+1].start, chunk.memory + t[i+1].start);
+            //BIO_printf(out, "  - txid: %.*s\n", t[i+1].end-t[i+1].start, chunk.memory + t[i+1].start);
             i++;
         } else if (jsoneq(chunk.memory, &t[i], "address") == 0) {
-            BIO_printf(out, "  - address: %.*s\n", t[i+1].end-t[i+1].start, chunk.memory + t[i+1].start);
+            //BIO_printf(out, "  - address: %.*s\n", t[i+1].end-t[i+1].start, chunk.memory + t[i+1].start);
             i++;
         } else if (jsoneq(chunk.memory, &t[i], "expires_in") == 0) {
-            BIO_printf(out, "  - expires_in: %.*s\n", t[i+1].end-t[i+1].start, chunk.memory + t[i+1].start);
+            //BIO_printf(out, "  - expires_in: %.*s\n", t[i+1].end-t[i+1].start, chunk.memory + t[i+1].start);
             i++;
         } else if (jsoneq(chunk.memory, &t[i], "expires_at") == 0) {
-            BIO_printf(out, "  - expires_at: %.*s\n", t[i+1].end-t[i+1].start, chunk.memory + t[i+1].start);
+            //BIO_printf(out, "  - expires_at: %.*s\n", t[i+1].end-t[i+1].start, chunk.memory + t[i+1].start);
             i++;
         } else if (jsoneq(chunk.memory, &t[i], "time") == 0) {
-            BIO_printf(out, "  - time: %.*s\n", t[i+1].end-t[i+1].start, chunk.memory + t[i+1].start);
+            //BIO_printf(out, "  - time: %.*s\n", t[i+1].end-t[i+1].start, chunk.memory + t[i+1].start);
             i++;
         } else {
-            BIO_printf(out, "Unexpected key: %.*s\n", t[i].end-t[i].start, chunk.memory + t[i].start);
+            //BIO_printf(out, "Unexpected key: %.*s\n", t[i].end-t[i].start, chunk.memory + t[i].start);
         }
     }
 
@@ -569,19 +591,23 @@ int X509_verify_cert(X509_STORE_CTX *ctx)
     unsigned char md[32];
     char compute_sha256_result[64];
     const EVP_MD *digest = NULL;
-
+#ifdef EMC_PRINT
     BIO_printf(out, "\n[4.1. Compute the hash of the certificate.]\n");
-
+#endif
 
     digest = EVP_get_digestbyname("sha256"); //Other hash functions should be supported in future.
     if (!digest) {
+#ifdef EMC_PRINT
         BIO_printf(out, "Unknown digest sha256\n");
+#endif
         ctx->error = X509_V_ERR_INVALID_HASH_FUNC;
         return -1;
     }
         
     if (!X509_digest(ctx->cert, digest, md, &n)) {
+#ifdef EMC_PRINT
         BIO_printf(out, "out of memory\n");
+#endif
         ctx->error = X509_V_ERR_OUT_OF_MEM;
         return -1;
     }
@@ -592,23 +618,27 @@ int X509_verify_cert(X509_STORE_CTX *ctx)
         //BIO_printf(out, "%02X%c", md[i], (i + 1 == (int)n)? '\n' : ':');
         step += sprintf(compute_sha256_result+step, "%02x", md[i]);
     }
-
+#ifdef EMC_PRINT
     BIO_printf(out, "sha256:%.*s\n", 64, compute_sha256_result);
-
+#endif
     //----------------------------------------
     // 4. 1     compare two values
     //----------------------------------------
+#ifdef EMC_PRINT
     BIO_printf(out, "\n[4.1. Compare the computed hash result with the hash received from the EMC core.]\n");
-
+#endif
     for (i = 0; i < 64; i++) {
         if (compute_sha256_result[i] != lookup_sha256_result[i]) {
             ctx->error = X509_V_ERR_HASH_NOT_MATCHED;
+#ifdef EMC_PRINT
             BIO_printf(out, "Two hash values are not matched.\n");
+#endif
             return -1;
         }
     }
 
     //BIO_printf(out, "success return 1\n");
+#endif
     return 1;
 //Jongho added - end
 
