@@ -35,7 +35,7 @@
 #include <curl/curl.h>  //curl commands to send a query to the blockchain core
 #include <jsmn.h>       //json parser
 #define EMC_CORE_URL "http://emccoinrpc:emccoinpass@127.0.0.1:8775"
-#define EMC_ISSUER_STR "O=EmerCoin, OU=PKI, CN=EMCSSL/emailAddress=team@emercoin.com/UID=EMC"
+#define EMC_ISSUER_STR "/O=EmerCoin/OU=PKI/CN=EMCSSL/emailAddress=team@emercoin.com/UID=EMC"
 
 struct MemoryStruct {
     char *memory;
@@ -381,10 +381,11 @@ int X509_verify_cert(X509_STORE_CTX *ctx)
     memcpy(buffer, bptr->data, bptr->length);
 #ifdef EMC_PRINT
     BIO_printf(out, "issuer:=%s\n", buffer);
+    BIO_printf(out, "issuer:=%s\n", EMC_ISSUER_STR);
 #endif
     BIO_free(bio);
     //check the issuer is not Emercoin
-    if (!strcmp(buffer, EMC_ISSUER_STR)) {
+    if (strcmp(buffer, EMC_ISSUER_STR) != 0) {
         if (DANETLS_ENABLED(dane))
             ret = dane_verify(ctx);
         else
