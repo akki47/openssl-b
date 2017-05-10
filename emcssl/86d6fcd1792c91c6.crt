@@ -1,0 +1,77 @@
+Certificate:
+    Data:
+        Version: 3 (0x2)
+        Serial Number:
+            86:d6:fc:d1:79:2c:91:c6
+    Signature Algorithm: ecdsa-with-SHA256
+        Issuer: O=EmerCoin, OU=PKI, CN=EMCSSL/emailAddress=team@emercoin.com/UID=EMC
+        Validity
+            Not Before: Nov 30 21:19:22 2016 GMT
+            Not After : Nov 29 21:19:22 2021 GMT
+        Subject: CN=Ankush Singla/emailAddress=abcd@xyz.com/UID=info:10b0085be05e167d:75026577fafe0aff372db9846805c8
+        Subject Public Key Info:
+            Public Key Algorithm: rsaEncryption
+                Public-Key: (2048 bit)
+                Modulus:
+                    00:df:ee:fe:1f:28:94:6a:7e:0d:12:39:9a:c9:3f:
+                    88:55:c3:a9:71:07:dd:1d:e3:9e:98:9e:b6:56:56:
+                    90:b5:18:8b:85:1b:e2:32:3d:d4:7f:ed:14:c5:b7:
+                    af:90:03:69:e5:a9:c0:7c:60:4c:0d:cf:e2:77:b8:
+                    57:9b:fd:83:79:ef:cf:75:cd:12:63:e1:9c:16:54:
+                    a3:0c:da:d5:00:ee:60:f2:cf:30:76:8d:af:0d:5a:
+                    91:ed:88:e4:ad:7d:9b:29:e1:22:7f:44:4a:41:cb:
+                    ad:72:e0:60:b3:b6:fc:20:bb:49:15:09:51:dc:30:
+                    b9:c0:94:ee:94:a1:79:4b:db:fd:f2:bb:a4:f8:a1:
+                    83:59:d1:ae:0c:7c:4d:08:dd:b3:23:75:0f:29:cd:
+                    48:17:6e:1d:f2:b5:56:f4:c7:b2:b7:9d:f9:a4:98:
+                    9f:1c:76:77:27:42:fd:3d:e0:16:0e:2d:54:0f:ee:
+                    64:32:f2:26:bd:9e:b8:6f:6b:87:81:b4:04:a8:b9:
+                    34:b1:ed:72:ce:ce:2f:00:ea:66:ea:91:ed:6e:d6:
+                    f1:7c:42:43:47:80:ec:3c:59:2b:61:88:28:68:12:
+                    59:68:5e:cb:b9:f2:40:d9:28:4c:1c:3e:24:55:f7:
+                    4e:00:77:71:42:f9:5a:f9:37:ba:f8:65:ac:a3:26:
+                    df:45
+                Exponent: 65537 (0x10001)
+        X509v3 extensions:
+            X509v3 Subject Key Identifier: 
+                97:34:68:78:9C:CA:6B:66:8C:00:EF:A7:E9:B3:8A:00:9E:6F:DE:A3
+            X509v3 Basic Constraints: 
+                CA:FALSE
+            X509v3 Key Usage: 
+                Digital Signature, Non Repudiation, Key Encipherment
+            Netscape Cert Type: 
+                SSL Client, S/MIME
+            Netscape Comment: 
+                EmerCoin EMCSSL PKI
+            X509v3 Authority Key Identifier: 
+                keyid:D5:A4:CD:E0:85:87:4F:4F:8A:74:2D:DD:6E:F9:EA:E1:FD:C8:E7:91
+                DirName:/O=EmerCoin/OU=PKI/CN=EMCSSL/emailAddress=team@emercoin.com/UID=EMC
+                serial:E0:D2:6B:F4:19:A1:3E:7F
+
+    Signature Algorithm: ecdsa-with-SHA256
+         30:45:02:20:0e:91:36:74:f4:eb:98:b0:90:e0:3a:bd:c6:82:
+         a0:99:d8:67:e5:64:da:11:c6:ff:8f:25:ff:0e:13:52:bf:c3:
+         02:21:00:99:5b:ad:c9:86:58:a5:8a:09:35:aa:25:81:b3:50:
+         61:c9:b0:dd:dc:cf:a1:03:d2:23:08:6e:78:af:38:c7:4e
+-----BEGIN CERTIFICATE-----
+MIIDuDCCA16gAwIBAgIJAIbW/NF5LJHGMAoGCCqGSM49BAMCMGkxETAPBgNVBAoT
+CEVtZXJDb2luMQwwCgYDVQQLEwNQS0kxDzANBgNVBAMTBkVNQ1NTTDEgMB4GCSqG
+SIb3DQEJARYRdGVhbUBlbWVyY29pbi5jb20xEzARBgoJkiaJk/IsZAEBEwNFTUMw
+HhcNMTYxMTMwMjExOTIyWhcNMjExMTI5MjExOTIyWjB7MRYwFAYDVQQDDA1Bbmt1
+c2ggU2luZ2xhMRswGQYJKoZIhvcNAQkBFgxhYmNkQHh5ei5jb20xRDBCBgoJkiaJ
+k/IsZAEBDDRpbmZvOjEwYjAwODViZTA1ZTE2N2Q6NzUwMjY1NzdmYWZlMGFmZjM3
+MmRiOTg0NjgwNWM4MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA3+7+
+HyiUan4NEjmayT+IVcOpcQfdHeOemJ62VlaQtRiLhRviMj3Uf+0UxbevkANp5anA
+fGBMDc/id7hXm/2Dee/Pdc0SY+GcFlSjDNrVAO5g8s8wdo2vDVqR7YjkrX2bKeEi
+f0RKQcutcuBgs7b8ILtJFQlR3DC5wJTulKF5S9v98ruk+KGDWdGuDHxNCN2zI3UP
+Kc1IF24d8rVW9Meyt535pJifHHZ3J0L9PeAWDi1UD+5kMvImvZ64b2uHgbQEqLk0
+se1yzs4vAOpm6pHtbtbxfEJDR4DsPFkrYYgoaBJZaF7LufJA2ShMHD4kVfdOAHdx
+Qvla+Te6+GWsoybfRQIDAQABo4IBEDCCAQwwHQYDVR0OBBYEFJc0aHicymtmjADv
+p+mzigCeb96jMAkGA1UdEwQCMAAwCwYDVR0PBAQDAgXgMBEGCWCGSAGG+EIBAQQE
+AwIFoDAiBglghkgBhvhCAQ0EFRYTRW1lckNvaW4gRU1DU1NMIFBLSTCBmwYDVR0j
+BIGTMIGQgBTVpM3ghYdPT4p0Ld1u+erh/cjnkaFtpGswaTERMA8GA1UEChMIRW1l
+ckNvaW4xDDAKBgNVBAsTA1BLSTEPMA0GA1UEAxMGRU1DU1NMMSAwHgYJKoZIhvcN
+AQkBFhF0ZWFtQGVtZXJjb2luLmNvbTETMBEGCgmSJomT8ixkAQETA0VNQ4IJAODS
+a/QZoT5/MAoGCCqGSM49BAMCA0gAMEUCIA6RNnT065iwkOA6vcaCoJnYZ+Vk2hHG
+/48l/w4TUr/DAiEAmVutyYZYpYoJNaolgbNQYcmw3dzPoQPSIwhueK84x04=
+-----END CERTIFICATE-----
